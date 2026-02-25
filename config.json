@@ -1,8 +1,15 @@
 {
     "type": "Settings",
     "audio": {
-        "input": { "encoding": "mulaw", "sample_rate": 8000 },
-        "output": { "encoding": "mulaw", "sample_rate": 8000, "container": "none" }
+        "input": {
+            "encoding": "mulaw",
+            "sample_rate": 8000
+        },
+        "output": {
+            "encoding": "mulaw",
+            "sample_rate": 8000,
+            "container": "none"
+        }
     },
     "agent": {
         "language": "en",
@@ -10,62 +17,88 @@
             "provider": {
                 "type": "deepgram",
                 "model": "nova-3",
-                "keyterms": ["appointment", "doctor", "booking"]
+                "keyterms": ["hello", "goodbye"]
             }
         },
         "think": {
             "provider": {
                 "type": "open_ai",
                 "model": "gpt-4o-mini",
-                "temperature": 0.5
+                "temperature": 0.7
             },
-            "prompt": "You are a professional appointment booking assistant. IMPORTANT: You are speaking over a phone line. NEVER use markdown formatting like asterisks (**) or underscores (_). ONLY output plain, speakable text. Do not use bullet points or bold text. 1) List doctors with list_doctors. 2) Get doctor information with get_doctor_info. 3) Book appointments with book_appointment. 4) Look up appointments with lookup_appointment. Always ask users to spell out their full name clearly. Confirm all details before processing. If a name is unclear, ask them to spell it out letter by letter.",
+            "prompt": "You are a professional appointment booking assistant. You can: 1) List doctors with list_doctors, 2) Get doctor information with get_doctor_info, 3) Book appointments with book_appointment, 4) Look up appointments with lookup_appointment. IMPORTANT: Always ask users to spell out their full name clearly when booking appointments. Confirm all appointment details before processing - including patient name, doctor name, and preferred time. Be thorough and professional in collecting information. If a user provides a name that's unclear, ask them to spell it out letter by letter. Always confirm the complete appointment details before finalizing any booking.",
             "functions": [
-                {
-                    "name": "list_doctors",
-                    "description": "Get a list of all available doctors with their specialties and locations.",
-                    "parameters": { "type": "object", "properties": {} }
-                },
-                {
-                    "name": "get_doctor_info",
-                    "description": "Get detailed information about a specific doctor including specialty, location, and next available slots.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "doctor_name": { "type": "string", "description": "e.g., 'Dr. John Smith'" }
-                        },
-                        "required": ["doctor_name"]
-                    }
-                },
-                {
-                    "name": "book_appointment",
-                    "description": "Book an appointment. Call this after verifying doctor availability and getting the patient's full name.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "patient_name": { "type": "string" },
-                            "doctor_name": { "type": "string" },
-                            "preferred_time": { "type": "string", "description": "Format: 'Monday 10:00 AM'" }
-                        },
-                        "required": ["patient_name", "doctor_name", "preferred_time"]
-                    }
-                },
-                {
-                    "name": "lookup_appointment",
-                    "description": "Look up an existing appointment by its ID.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "appointment_id": { "type": "integer" }
-                        },
-                        "required": ["appointment_id"]
-                    }
+              {
+                "name": "list_doctors",
+                "description": "Get a list of all available doctors with their specialties and locations. Use this function when: A patient wants to know who the doctors are. A patient wants to see available doctors. A patient says 'Who are the doctors?' or 'What doctors do you have?'. This shows all doctors in the system.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {}
                 }
+              },
+              {
+                "name": "get_doctor_info",
+                "description": "Get detailed information about a specific doctor including specialty, location, availability, and next available appointment slots. Use this function when: A patient asks about a specific doctor. A patient wants to know a doctor's availability. A patient asks 'Tell me about Dr. Smith' or 'What time slots does Dr. Wilson have?'. Always provide helpful information about the doctor's specialties, location, and available times.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "doctor_name": {
+                      "type": "string",
+                      "description": "Name of the doctor to look up. Examples: 'Dr. John Smith', 'Dr. Sarah Wilson', 'Dr. Michael Brown', 'Dr. Emily Davis', 'Dr. David Martinez'"
+                    }
+                  },
+                  "required": ["doctor_name"]
+                }
+              },
+              {
+                "name": "book_appointment",
+                "description": "Book an appointment with a doctor. Use this function when: A patient wants to book an appointment. A patient says 'I need to schedule an appointment' or 'Can I see Dr. Smith?'. Get the patient's full name. Confirm the preferred date and time. Always confirm all appointment details before processing.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "patient_name": {
+                      "type": "string",
+                      "description": "Patient's full name for the appointment. Use as provided by the patient."
+                    },
+                    "doctor_name": {
+                      "type": "string",
+                      "description": "Name of the doctor. Examples: 'Dr. John Smith', 'Dr. Sarah Wilson', 'Dr. Michael Brown', 'Dr. Emily Davis', 'Dr. David Martinez'"
+                    },
+                    "preferred_date": {
+                      "type": "string",
+                      "description": "Preferred appointment day. Must be a valid day for the doctor. Format examples: 'Tommorrow'"
+                    },
+                    "preferred_time": {
+                      "type": "string",
+                      "description": "Preferred appointment time slot. Must be a valid available slot for the doctor. Format examples: '10:00 AM', '2:30 PM'"
+                    }
+                  },
+                  "required": ["patient_name", "doctor_name", "preferred_day", "preferred_time"]
+                }
+              },
+              {
+                "name": "lookup_appointment",
+                "description": "Look up an existing appointment by patient name. Use this function when: A patient asks about a specific appointment. A patient wants to check appointment details. A patient says 'When is my appointment scheduled?' or 'Can you check my appointment?'. A patient provides Its name.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "patient_name": {
+                      "type": "string",
+                      "description": "Patient's full name for the appointment. Use as provided by the patient."
+                    }
+                  },
+                  "required": ["patient_name"]
+                }
+              }
             ]
         },
         "speak": {
-            "provider": { "type": "deepgram", "model": "aura-2-thalia-en" }
+            "provider": {
+                "type": "deepgram",
+                "model": "aura-2-thalia-en"
+            }
         },
-        "greeting": "Hello! I'm your appointment booking assistant. I can help you view available doctors, get doctor information, book appointments, and check your appointment details. How can I assist you today?"
+        "greeting": "Hello! i am assistant"
+        
     }
 }

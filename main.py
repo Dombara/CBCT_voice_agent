@@ -81,7 +81,7 @@ async def handle_function_call_request(decoded, sts_ws):
 
 
 async def handle_text_message(decoded, twilio_ws, sts_ws, streamsid):
-    await handle_barge_in(decoded, twilio_ws, streamsid)
+    # await handle_barge_in(decoded, twilio_ws, streamsid)
 
     if decoded["type"] == "FunctionCallRequest":
         await handle_function_call_request(decoded, sts_ws)
