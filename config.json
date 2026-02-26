@@ -70,8 +70,9 @@
                       "description": "Name of the doctor. Examples: 'Dr. John Smith', 'Dr. Sarah Wilson', 'Dr. Michael Brown', 'Dr. Emily Davis', 'Dr. David Martinez'"
                     },
                     "preferred_date": {
-                      "type": "date",
-                      "description": "Preferred appointment day. Must be a valid day for the doctor. Format examples: 'Tommorrow'"
+                      "type": "string",
+                      "format": "date",
+                      "description": "Preferred appointment day. Must be a valid day for the doctor. Format: 'YYYY-MM-DD'"
                     },
                     "preferred_time": {
                       "type": "string",
@@ -88,11 +89,15 @@
                   "type": "object",
                   "properties": {
                     "appointment_id": {
-                      "type": "integer",
+                      "type": "string",
                       "description": "The appointment ID number to look up. Must be a valid appointment number in our system."
+                    },
+                    "patient_name": {
+                      "type": "string",
+                      "description": "Full name of the patient whose appointment you want to look up. Optional if appointment_id is provided."
                     }
                   },
-                  "required": ["appointment_id"]
+                  "required": []
                 }
               },
               {

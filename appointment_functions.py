@@ -139,9 +139,9 @@ def book_appointment(patient_name, doctor_name, preferred_date, preferred_time):
         }
 
     registered_user = user_collection.find_one({
-        "name": {"$regex": patient_name, "$options": "i"}
+        "username": {"$regex": patient_name, "$options": "i"}
     })
-    
+    print("checking if patient is registered: ", registered_user)
 
     doctor = doctor_collection.find_one({
         "name": {"$regex": doctor_name, "$options": "i"}
@@ -166,11 +166,11 @@ def book_appointment(patient_name, doctor_name, preferred_date, preferred_time):
 
     if registered_user: 
         appointment = {
-        "userId": registered_user["_id"],
+        "patientId": registered_user["_id"],
+        "patientName": registered_user['username'],
         "doctorId": doctor_id,
         "doctorName": doctor["name"],
         # "patientName": patient_name,
-        "patientName": registered_user['username'],
         "date": normalized_date,
         "time": normalized_time,
         "status": "confirmed",
