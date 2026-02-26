@@ -1,14 +1,13 @@
-# Render deployment configuration
-# See https://render.com/docs/deploy-to-render for details
-
-# Python web service example
 services:
   - type: web
-    name: voice-agent
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "python main.py"
-    autoDeploy: true
+    name: voice-agent-backend
+    runtime: python
+    buildCommand: "uv sync --frozen && uv cache prune --ci"
+    startCommand: "gunicorn -w 4 -k uvicorn.workers.UvicornWorker backend.main:app"
     envVars:
       - key: PYTHON_VERSION
-        value: 3.10
+        value: 3.12.1
+      - key: SECRET_KEY
+        generateValue: true # Render will generate a random string for you
+      - key: ALGORITHM
+        value: "HS256"

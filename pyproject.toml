@@ -1,10 +1,19 @@
 [project]
 name = "voice-agent"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
-requires-python = ">=3.13"
+description = "FastAPI backend for voice agent"
 dependencies = [
-    "python-dotenv>=1.1.1",
-    "websockets>=15.0.1",
+    "fastapi",
+    "uvicorn",
+    "gunicorn",
+    "python-jose[cryptography]",
+    "pwdlib[argon2]",
+    "pydantic-settings",
+    "python-dotenv",
+    "sqlalchemy",
+    "sqlmodel",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
