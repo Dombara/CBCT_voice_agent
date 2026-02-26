@@ -1,70 +1,12 @@
-from db import doctor_collection, appointment_collection
+from db import doctor_collection, appointment_collection, user_collection
 from pymongo.errors import DuplicateKeyError
 from datetime import datetime
 from bson import ObjectId
 
 from utils.date_utils import normalize_date, normalize_time
 
-# Simple in-memory storage
-# APPOINTMENTS_DB = {"appointments": {}, "next_id": 1000}
-
-# DOCTORS_DB = {
-#     "john_smith": {
-#         "name": "Dr. John Smith",
-#         "specialization": "General Practitioner",
-#         "availability": ["Monday 9AM-5PM", "Tuesday 9AM-5PM", "Wednesday 9AM-1PM", "Thursday 9AM-5PM", "Friday 9AM-5PM"],
-#         "location": "Building A, Room 101",
-#         "phone": "555-0101"
-#     },
-#     "sarah_wilson": {
-#         "name": "Dr. Sarah Wilson",
-#         "specialization": "Cardiology",
-#         "availability": ["Monday 10AM-4PM", "Wednesday 10AM-4PM", "Friday 10AM-4PM"],
-#         "location": "Building B, Room 205",
-#         "phone": "555-0102"
-#     },
-#     "michael_brown": {
-#         "name": "Dr. Michael Brown",
-#         "specialization": "Orthopedics",
-#         "availability": ["Tuesday 8AM-12PM", "Wednesday 2PM-6PM", "Thursday 8AM-12PM", "Friday 1PM-5PM"],
-#         "location": "Building C, Room 310",
-#         "phone": "555-0103"
-#     },
-#     "emily_davis": {
-#         "name": "Dr. Emily Davis",
-#         "specialization": "Dermatology",
-#         "availability": ["Monday 1PM-5PM", "Tuesday 9AM-1PM", "Thursday 2PM-6PM"],
-#         "location": "Building A, Room 202",
-#         "phone": "555-0104"
-#     },
-#     "david_martinez": {
-#         "name": "Dr. David Martinez",
-#         "specialization": "Pediatrics",
-#         "availability": ["Monday 9AM-12PM", "Tuesday 1PM-5PM", "Wednesday 9AM-12PM", "Thursday 1PM-5PM", "Friday 9AM-12PM"],
-#         "location": "Building B, Room 150",
-#         "phone": "555-0105"
-#     }
-# }
-
-# APPOINTMENT_SLOTS = {
-#     "john_smith": ["Monday 10:00 AM", "Monday 2:00 PM", "Tuesday 11:00 AM", "Tuesday 3:00 PM", "Wednesday 10:00 AM", "Thursday 9:00 AM", "Thursday 2:00 PM", "Friday 1:00 PM"],
-#     "sarah_wilson": ["Monday 10:30 AM", "Monday 3:00 PM", "Wednesday 11:00 AM", "Wednesday 3:30 PM", "Friday 10:00 AM", "Friday 2:00 PM"],
-#     "michael_brown": ["Tuesday 8:30 AM", "Tuesday 11:00 AM", "Wednesday 2:30 PM", "Wednesday 4:00 PM", "Thursday 9:00 AM", "Friday 1:30 PM"],
-#     "emily_davis": ["Monday 1:30 PM", "Monday 4:00 PM", "Tuesday 9:30 AM", "Tuesday 12:00 PM", "Thursday 2:30 PM"],
-#     "david_martinez": ["Monday 9:30 AM", "Monday 11:00 AM", "Tuesday 1:30 PM", "Tuesday 3:00 PM", "Wednesday 9:30 AM", "Wednesday 11:00 AM", "Thursday 1:30 PM", "Friday 9:30 AM"]
-# }
 
 
-
-
-
-
-
-
-
-
-
-# Operations on the Mock DB
 
 # def get_doctor_info(doctor_name):
 #     """Get information about a specific doctor."""
@@ -82,44 +24,42 @@ from utils.date_utils import normalize_date, normalize_time
 #         }
 #     return {"error": f"Doctor '{doctor_name}' not found. Available doctors: Dr. John Smith, Dr. Sarah Wilson, Dr. Michael Brown, Dr. Emily Davis, Dr. David Martinez"}
 
-# from db import doctor_collection, slot_collection
+def get_doctor_info(doctor_name):
+    doctor = doctor_collection.find_one({"name": {"$regex": doctor_name, "$options": "i"}})
 
-# def get_doctor_info(doctor_name):
-#     doctor = doctor_collection.find_one({"name": {"$regex": doctor_name, "$options": "i"}})
+    if not doctor:
+        return {"error": f"Doctor '{doctor_name}' not found"}
 
-#     if not doctor:
-#         return {"error": f"Doctor '{doctor_name}' not found"}
-
-#     slots = slot_collection.find({"doctor_id": doctor["_id"], "available": True}).limit(3)
-
-#     slot_list = [slot["time"] for slot in slots]
-
-#     return {
-#         "name": doctor["name"],
-#         "specialization": doctor["specialization"],
-#         "location": doctor["location"],
-#         "phone": doctor["phone"],
-#         "next_available_slots": slot_list
-#     }
+    return {
+        "name": doctor["name"],
+        "specialization": doctor["specialization"],
+        "location": doctor["location"],
+        "phone": doctor["phone"],
+        # "next_available_slots": slot_list
+    }
 
 
 
 
+def list_doctors(category: str):
 
+    doctors = list(doctor_collection.find({
+        "categoryName": {"$regex": f"^{category}$", "$options": "i"}
+    }))
 
+    if not doctors:
+        return {
+            "message": f"Sorry, no doctors found under {category}."
+        }
 
+    doctor_names = [doc["name"] for doc in doctors]
 
+    spoken_list = ", ".join(doctor_names)
 
-
-
-
-
-
-
-
-
-
-
+    return {
+        "message": f"Here are the available {category} doctors: {spoken_list}.",
+        "doctors": doctor_names 
+    }
 
 
 
@@ -135,125 +75,6 @@ from utils.date_utils import normalize_date, normalize_time
 
 
 
-# def book_appointment(patient_name, doctor_name, preferred_time):
-#     """Book an appointment with a doctor."""
-#     doctor_key = doctor_name.lower().replace(" ", "_")
-#     doctor = DOCTORS_DB.get(doctor_key)
-#     if not doctor:
-#         return {"error": f"Doctor '{doctor_name}' not found"}
-
-#     available_slots = APPOINTMENT_SLOTS.get(doctor_key, [])
-#     if preferred_time not in available_slots:
-#         return {
-#             "error": f"Time slot '{preferred_time}' is not available",
-#             "available_slots": available_slots[:5]
-#         }
-
-#     appointment_id = APPOINTMENTS_DB["next_id"]
-#     APPOINTMENTS_DB["next_id"] += 1
-
-#     appointment = {
-#         "id": appointment_id,
-#         "patient": patient_name,
-#         "doctor": doctor["name"],
-#         "doctor_specialization": doctor["specialization"],
-#         "time": preferred_time,
-#         "location": doctor["location"],
-#         "status": "confirmed"
-#     }
-#     APPOINTMENTS_DB["appointments"][appointment_id] = appointment
-
-#     # Remove the booked slot from availability
-#     APPOINTMENT_SLOTS[doctor_key].remove(preferred_time)
-
-#     return {
-#         "appointment_id": appointment_id,
-#         "message": f"Appointment confirmed! You have an appointment with{doctor['name']} ({doctor['specialization']}) on {preferred_time}",
-#         "doctor": doctor["name"],
-#         "time": preferred_time,
-#         "location": doctor["location"],
-#         "phone": doctor["phone"]
-#     }
-
-# from datetime import datetime
-
-# def book_appointment(patient_name, doctor_name, preferred_day, preferred_time):
-#     doctor = doctor_collection.find_one(
-#         {"name": {"$regex": doctor_name, "$options": "i"}}
-#     )
-
-#     if not doctor:
-#         return {"error": f"Doctor '{doctor_name}' not found"}
-
-#     slot = slot_collection.find_one({
-#         "doctor_id": doctor["_id"],
-#         "time": preferred_time,
-#         "available": True
-#     })
-
-#     if not slot:
-#         return {"error": f"Time slot '{preferred_time}' not available"}
-
-#     # Create appointment
-#     appointment = {
-#         "patient": patient_name,
-#         "doctor_id": doctor["_id"],
-#         "doctor_name": doctor["name"],
-#         "time": preferred_time,
-#         "location": doctor["location"],
-#         "status": "confirmed",
-#         "created_at": datetime.utcnow()
-#     }
-
-#     result = appointment_collection.insert_one(appointment)
-
-#     # Mark slot unavailable
-#     slot_collection.update_one(
-#         {"_id": slot["_id"]},
-#         {"$set": {"available": False}}
-#     )
-
-#     return {
-#         "appointment_id": str(result.inserted_id),
-#         "doctor": doctor["name"],
-#         "time": preferred_time,
-#         "location": doctor["location"],
-#         "message": "Appointment confirmed"
-#     }
-
-
-# def book_appointment(patient_name, patient_phone, doctor_name, preferred_date, preferred_time):
-
-#     doctor = doctor_collection.find_one({
-#         "name": {"$regex": doctor_name, "$options": "i"}
-#     })
-
-#     if not doctor:
-#         return {"error": "Doctor not found"}
-
-#     try:
-#         appointment = {
-#             "doctorId": doctor["_id"],
-#             "doctorName": doctor["name"],
-#             "patientName": patient_name,
-#             # "patientPhone": patient_phone,
-#             "date": preferred_date,
-#             "startTime": preferred_time,
-#             "status": "confirmed",
-#             "createdAt": datetime.utcnow()
-#         }
-
-#         appointment_collection.insert_one(appointment)
-
-#         return {
-#             "message": f"Appointment confirmed with {doctor['name']} at {preferred_time}"
-#         }
-
-#     except DuplicateKeyError:
-#         return {
-#             "error": "Slot already booked",
-#             "message": "That time is already taken. Please choose another time."
-#         }
 
 
 
@@ -306,10 +127,8 @@ from utils.date_utils import normalize_date, normalize_time
 #         "message": "Appointment confirmed successfully"
 #     }
 
-from utils.date_utils import normalize_date, normalize_time
 
 def book_appointment(patient_name, doctor_name, preferred_date, preferred_time):
-
     try:
         normalized_date = normalize_date(preferred_date)
         normalized_time = normalize_time(preferred_time)
@@ -318,6 +137,11 @@ def book_appointment(patient_name, doctor_name, preferred_date, preferred_time):
             "error": "Invalid date or time",
             "message": str(e)
         }
+
+    registered_user = user_collection.find_one({
+        "name": {"$regex": patient_name, "$options": "i"}
+    })
+    
 
     doctor = doctor_collection.find_one({
         "name": {"$regex": doctor_name, "$options": "i"}
@@ -340,15 +164,30 @@ def book_appointment(patient_name, doctor_name, preferred_date, preferred_time):
             "message": "That time is not available. Please choose another time."
         }
 
-    appointment = {
+    if registered_user: 
+        appointment = {
+        "userId": registered_user["_id"],
         "doctorId": doctor_id,
         "doctorName": doctor["name"],
-        "patientName": patient_name,
+        # "patientName": patient_name,
+        "patientName": registered_user['username'],
         "date": normalized_date,
         "time": normalized_time,
-        # "status": "confirmed",
+        "status": "confirmed",
+        "paymentStatus": "Pending"
         # "createdAt": datetime.utcnow()
     }
+    else:
+        appointment = {
+            "doctorId": doctor_id,
+            "doctorName": doctor["name"],
+            "patientName": patient_name,
+            "date": normalized_date,
+            "time": normalized_time,
+            "status": "confirmed",
+            "paymentStatus": "Pending"
+            # "createdAt": datetime.utcnow()
+        }
 
     result = appointment_collection.insert_one(appointment)
 
@@ -362,30 +201,6 @@ def book_appointment(patient_name, doctor_name, preferred_date, preferred_time):
 
 
 
-
-
-
-
-
-
-
-
-
-
-# def lookup_appointment(appointment_id):
-#     """Look up an existing appointment."""
-#     appointment = APPOINTMENTS_DB["appointments"].get(int(appointment_id))
-#     if appointment:
-#         return {
-#             "appointment_id": appointment_id,
-#             "patient": appointment["patient"],
-#             "doctor": appointment["doctor"],
-#             "doctor_specialization": appointment["doctor_specialization"],
-#             "time": appointment["time"],
-#             "location": appointment["location"],
-#             "status": appointment["status"]
-#         }
-#     return {"error": f"Appointment {appointment_id} not found"}
 
 def lookup_appointment(patient_name):
 
@@ -403,24 +218,170 @@ def lookup_appointment(patient_name):
         "time": appointment["time"]
     }
 
-# def list_doctors():
-#     doctors = doctor_collection.find()
 
-#     doctor_list = []
-#     for doc in doctors:
-#         doctor_list.append({
-#             "name": doc["name"],
-#             "specialization": doc["specialization"],
-#             "location": doc["location"]
-#         })
 
-#     return {"doctors": doctor_list}
+def cancel_appointment(patient_name, doctor_name, appointment_date, appointment_time):
+    try:
+        normalized_date = normalize_date(appointment_date)
+        normalized_time = normalize_time(appointment_time)
+    except ValueError as e:
+        return {"error": str(e)}
+
+    doctor = doctor_collection.find_one({
+        "name": {"$regex": doctor_name, "$options": "i"}
+    })
+
+    if not doctor:
+        return {"error": "Doctor not found."}
+
+    result = appointment_collection.find_one_and_update(
+        {
+            "doctorId": doctor["_id"],
+            "patientName": patient_name,
+            "date": normalized_date,
+            "time": normalized_time,
+            "status": "confirmed"
+        },
+        {
+            "$set": {"status": "cancelled"}
+        }
+    )
+
+    if not result:
+        return {
+            "error": "No matching appointment found."
+        }
+
+    return {
+        "message": f"Your appointment on {normalized_date} at {normalized_time} has been successfully cancelled."
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# {
+#                 "name": "reschedule_appointment",
+#                 "description": "Reschedule an existing appointment to a new date and time. Call this function when the patient wants to change the date or time of a booked appointment. Make sure you have both the old appointment details and the new preferred date and time before calling.",
+#                 "parameters": {
+#                   "type": "object",
+#                   "properties": {
+#                     "patient_name": {
+#                       "type": "string",
+#                       "description": "Full name of the patient."
+#                     },
+#                     "doctor_name": {
+#                       "type": "string",
+#                       "description": "Doctor with whom the appointment exists."
+#                     },
+#                     "old_date": {
+#                       "type": "string",
+#                       "description": "Existing appointment date in natural language."
+#                     },
+#                     "old_time": {
+#                       "type": "string",
+#                       "description": "Existing appointment time in natural language."
+#                     },
+#                     "new_date": {
+#                       "type": "string",
+#                       "description": "New preferred appointment date in natural language."
+#                     },
+#                     "new_time": {
+#                       "type": "string",
+#                       "description": "New preferred appointment time in natural language."
+#                     }
+#                   },
+#                   "required": [
+#                     "patient_name",
+#                     "doctor_name",
+#                     "old_date",
+#                     "old_time",
+#                     "new_date",
+#                     "new_time"
+#                   ]
+#                 }
+#               }
+
+# def reschedule_appointment(
+#     patient_name,
+#     doctor_name,
+#     old_date,
+#     old_time,
+#     new_date,
+#     new_time
+# ):
+
+#     try:
+#         old_date_norm = normalize_date(old_date)
+#         old_time_norm = normalize_time(old_time)
+#         new_date_norm = normalize_date(new_date)
+#         new_time_norm = normalize_time(new_time)
+#     except ValueError as e:
+#         return {"error": str(e)}
+
+#     doctor = doctor_collection.find_one({
+#         "name": {"$regex": doctor_name, "$options": "i"}
+#     })
+
+#     if not doctor:
+#         return {"error": "Doctor not found."}
+
+#     # Check if new slot is already booked
+#     conflict = appointment_collection.find_one({
+#         "doctorId": doctor["_id"],
+#         "date": new_date_norm,
+#         "time": new_time_norm,
+#         "status": "confirmed"
+#     })
+
+#     if conflict:
+#         return {
+#             "error": "Requested new time slot is already booked. Please choose another time."
+#         }
+
+#     # Update existing appointment
+#     updated = appointment_collection.find_one_and_update(
+#         {
+#             "doctorId": doctor["_id"],
+#             "patientName": patient_name,
+#             "date": old_date_norm,
+#             "time": old_time_norm,
+#             "status": "confirmed"
+#         },
+#         {
+#             "$set": {
+#                 "date": new_date_norm,
+#                 "time": new_time_norm
+#             }
+#         }
+#     )
+
+#     if not updated:
+#         return {"error": "Original appointment not found."}
+
+#     return {
+#         "message": f"Your appointment has been rescheduled to {new_date_norm} at {new_time_norm}."
+#     }
+
+
 
 
 # Function mapping dictionary
 FUNCTION_MAP = {
-    # 'get_doctor_info': get_doctor_info,
+    'list_doctors': list_doctors,
+    'get_doctor_info': get_doctor_info,
     'book_appointment': book_appointment,
     'lookup_appointment': lookup_appointment,
-    # 'list_doctors': list_doctors
+    'cancel_appointment': cancel_appointment,
+    # 'reschedule_appointment': reschedule_appointment,
 }

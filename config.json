@@ -26,14 +26,19 @@
                 "model": "gpt-4o-mini",
                 "temperature": 0.7
             },
-            "prompt": "You are a professional appointment booking assistant. You can: 1) List doctors with list_doctors, 2) Get doctor information with get_doctor_info, 3) Book appointments with book_appointment, 4) Look up appointments with lookup_appointment. IMPORTANT: Always ask users to spell out their full name clearly when booking appointments. Confirm all appointment details before processing - including patient name, doctor name, and preferred time. Be thorough and professional in collecting information. If a user provides a name that's unclear, ask them to spell it out letter by letter. Always confirm the complete appointment details before finalizing any booking.",
+            "prompt": "You are a professional appointment booking assistant. You can: 1) List doctors with list_doctors, 2) Get doctor information with get_doctor_info, 3) Book appointments with book_appointment, 4) Look up appointments with lookup_appointment. IMPORTANT: Always ask users to spell out their full name clearly when booking appointments. Confirm all appointment details before processing - including patient name, doctor name, and preferred time. Be thorough and professional in collecting information. If a user provides a name that's unclear, ask them to spell it out letter by letter. Always confirm the complete appointment details before finalizing any booking. Respond ONLY in plain, conversational text. NEVER use Markdown, asterisks (**), hashtags (#), or bullet points, as they are read aloud by the system and sound like 'star star'. Use natural sentences and commas for pacing instead",
             "functions": [
               {
                 "name": "list_doctors",
-                "description": "Get a list of all available doctors with their specialties and locations. Use this function when: A patient wants to know who the doctors are. A patient wants to see available doctors. A patient says 'Who are the doctors?' or 'What doctors do you have?'. This shows all doctors in the system.",
+                "description": "Get a list of doctors by medical category. If the patient mentions symptoms, infer the appropriate category before calling this function. If no category is provided, ask the patient which category they are interested in.",
                 "parameters": {
                   "type": "object",
-                  "properties": {}
+                  "properties": {
+                    "category": {
+                      "type": "string",
+                      "description": "Medical specialization such as Dentist, Cardiologist, Dermatologist, Orthopedic, etc."
+                    }
+                  }
                 }
               },
               {
@@ -65,7 +70,7 @@
                       "description": "Name of the doctor. Examples: 'Dr. John Smith', 'Dr. Sarah Wilson', 'Dr. Michael Brown', 'Dr. Emily Davis', 'Dr. David Martinez'"
                     },
                     "preferred_date": {
-                      "type": "string",
+                      "type": "date",
                       "description": "Preferred appointment day. Must be a valid day for the doctor. Format examples: 'Tommorrow'"
                     },
                     "preferred_time": {
@@ -78,18 +83,45 @@
               },
               {
                 "name": "lookup_appointment",
-                "description": "Look up an existing appointment by patient name. Use this function when: A patient asks about a specific appointment. A patient wants to check appointment details. A patient says 'When is my appointment scheduled?' or 'Can you check my appointment?'. A patient provides Its name.",
+                "description": "Look up an existing appointment by its ID. Use this function when: A patient asks about a specific appointment. A patient wants to check appointment details. A patient says 'What is my appointment ID?' or 'Can you check my appointment?'. A patient provides an appointment ID number. Always verify the appointment exists and provide clear information about the appointment details.",
+                "parameters": {
+                  "type": "object",
+                  "properties": {
+                    "appointment_id": {
+                      "type": "integer",
+                      "description": "The appointment ID number to look up. Must be a valid appointment number in our system."
+                    }
+                  },
+                  "required": ["appointment_id"]
+                }
+              },
+              {
+                "name": "cancel_appointment",
+                "description": "Cancel an existing appointment. Call this function when the patient wants to cancel a booked appointment. Ensure you have the patient name, doctor name, appointment date, and appointment time before calling this function. If any detail is missing, ask the user for clarification.",
                 "parameters": {
                   "type": "object",
                   "properties": {
                     "patient_name": {
                       "type": "string",
-                      "description": "Patient's full name for the appointment. Use as provided by the patient."
+                      "description": "Full name of the patient who booked the appointment."
+                    },
+                    "doctor_name": {
+                      "type": "string",
+                      "description": "Name of the doctor with whom the appointment was booked."
+                    },
+                    "appointment_date": {
+                      "type": "string",
+                      "description": "Date of the appointment in natural language. Example: Tomorrow, 26 February, 1 March."
+                    },
+                    "appointment_time": {
+                      "type": "string",
+                      "description": "Time of the appointment in natural language. Example: 10 AM, 4:30 PM."
                     }
                   },
-                  "required": ["patient_name"]
+                  "required": ["patient_name", "doctor_name", "appointment_date", "appointment_time"]
                 }
               }
+
             ]
         },
         "speak": {
@@ -98,7 +130,6 @@
                 "model": "aura-2-thalia-en"
             }
         },
-        "greeting": "Hello! i am assistant"
-        
+        "greeting": "Hello! I'm your appointment booking assistant. I can help you view available doctors, get doctor information, book appointments, and check your appointment details. How can I assist you today?"
     }
 }

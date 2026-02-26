@@ -15,4 +15,9 @@ db = client["fyp_db"]
 
 doctor_collection = db["doctor_collection"]
 appointment_collection = db["appointment_collection"]
-# slot_collection = db["slot_collection"]
+user_collection = db["user_collection"]
+
+
+
+
+
