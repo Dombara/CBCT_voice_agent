@@ -1,0 +1,7 @@
+# requirements.txt for Render deployment
+# Add all required packages here
+
+# Example dependencies
+flask
+python-dotenv
+# Add any other dependencies your project needs
