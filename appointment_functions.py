@@ -25,7 +25,8 @@ from utils.date_utils import normalize_date, normalize_time
 #     return {"error": f"Doctor '{doctor_name}' not found. Available doctors: Dr. John Smith, Dr. Sarah Wilson, Dr. Michael Brown, Dr. Emily Davis, Dr. David Martinez"}
 
 def get_doctor_info(doctor_name):
-    doctor = doctor_collection.find_one({"name": {"$regex": doctor_name, "$options": "i"}})
+    doctor = doctor_collection.find_one({"name": {"$regex": doctor_name.strip(), "$options": "i"}
+})
 
     if not doctor:
         return {"error": f"Doctor '{doctor_name}' not found"}
@@ -82,7 +83,7 @@ def list_doctors(category: str):
 
 #     # 1️⃣ Find doctor
 #     doctor = doctor_collection.find_one({
-#         "name": {"$regex": doctor_name, "$options": "i"}
+#         "name": {"$regex": doctor_name.strip(), "$options": "i"}
 #     })
 
 #     if not doctor:
@@ -144,8 +145,9 @@ def book_appointment(patient_name, doctor_name, preferred_date, preferred_time):
     print("checking if patient is registered: ", registered_user)
 
     doctor = doctor_collection.find_one({
-        "name": {"$regex": doctor_name, "$options": "i"}
+        "name": {"$regex": doctor_name.strip(), "$options": "i"} 
     })
+
 
     if not doctor:
         return {"error": "Doctor not found"}
@@ -202,11 +204,32 @@ def book_appointment(patient_name, doctor_name, preferred_date, preferred_time):
 
 
 
-def lookup_appointment(patient_name):
+# def lookup_appointment(patient_name):
 
-    appointment = appointment_collection.find_one(
-        {"patientName": {"$regex": f"^{patient_name}$", "$options": "i"}}
-    )
+#     appointment = appointment_collection.find_one(
+#         {"patientName": {"$regex": f"^{patient_name}$", "$options": "i"}}
+#     )
+
+#     if not appointment:
+#         return {"error": "Appointment not found"}
+
+#     return {
+#         "patient": appointment["patientName"],
+#         "doctor": appointment["doctorName"],
+#         "date": appointment["date"],
+#         "time": appointment["time"]
+#     }
+def lookup_appointment(patient_name=None, appointment_id=None):
+    query = {}
+
+    if appointment_id:
+        query["_id"] = ObjectId(appointment_id)
+    elif patient_name:
+        query["patientName"] = {"$regex": f"^{patient_name}$", "$options": "i"}
+    else:
+        return {"error": "Provide patient name or appointment ID"}
+
+    appointment = appointment_collection.find_one(query)
 
     if not appointment:
         return {"error": "Appointment not found"}
@@ -228,7 +251,7 @@ def cancel_appointment(patient_name, doctor_name, appointment_date, appointment_
         return {"error": str(e)}
 
     doctor = doctor_collection.find_one({
-        "name": {"$regex": doctor_name, "$options": "i"}
+        "name": {"$regex": doctor_name.strip(), "$options": "i"}
     })
 
     if not doctor:
@@ -330,7 +353,7 @@ def cancel_appointment(patient_name, doctor_name, appointment_date, appointment_
 #         return {"error": str(e)}
 
 #     doctor = doctor_collection.find_one({
-#         "name": {"$regex": doctor_name, "$options": "i"}
+#         "name": {"$regex": doctor_name.strip(), "$options": "i"}
 #     })
 
 #     if not doctor:
@@ -374,6 +397,56 @@ def cancel_appointment(patient_name, doctor_name, appointment_date, appointment_
 #     }
 
 
+def reschedule_appointment(patient_name, doctor_name, old_date, old_time, new_date, new_time):
+    try:
+        old_date = normalize_date(old_date)
+        old_time = normalize_time(old_time)
+        new_date = normalize_date(new_date)
+        new_time = normalize_time(new_time)
+    except ValueError as e:
+        return {"error": str(e)}
+
+    doctor = doctor_collection.find_one({
+        "name": {"$regex": doctor_name.strip(), "$options": "i"}
+    })
+
+    if not doctor:
+        return {"error": "Doctor not found"}
+
+    # Check new slot availability
+    existing = appointment_collection.find_one({
+        "doctorId": doctor["_id"],
+        "date": new_date,
+        "time": new_time
+    })
+
+    if existing:
+        return {"error": "New slot already booked"}
+
+    # Update appointment
+    result = appointment_collection.find_one_and_update(
+        {
+            "doctorId": doctor["_id"],
+            "patientName": patient_name,
+            "date": old_date,
+            "time": old_time,
+            "status": "confirmed"
+        },
+        {
+            "$set": {
+                "date": new_date,
+                "time": new_time
+            }
+        }
+    )
+
+    if not result:
+        return {"error": "Original appointment not found"}
+
+    return {
+        "message": f"Appointment rescheduled to {new_date} at {new_time}"
+    }
+
 
 
 # Function mapping dictionary
@@ -383,5 +456,5 @@ FUNCTION_MAP = {
     'book_appointment': book_appointment,
     'lookup_appointment': lookup_appointment,
     'cancel_appointment': cancel_appointment,
-    # 'reschedule_appointment': reschedule_appointment,
+    'reschedule_appointment': reschedule_appointment,
 }
