@@ -2,7 +2,7 @@ from db import doctor_collection, appointment_collection, user_collection
 from pymongo.errors import DuplicateKeyError
 from datetime import datetime
 from bson import ObjectId
-
+import re
 from utils.date_utils import normalize_date, normalize_time
 
 
@@ -42,7 +42,17 @@ def get_doctor_info(doctor_name):
 
 
 
-def list_doctors(category: str):
+def list_doctors(category: str = None):
+
+    if not category:
+        available_categories = [c for c in doctor_collection.distinct("categoryName") if c]
+        if available_categories:
+            return {
+                "message": f"Please tell me a category. Available categories are: {', '.join(available_categories)}."
+            }
+        return {
+            "message": "Please tell me which doctor category you are looking for."
+        }
 
     doctors = list(doctor_collection.find({
         "categoryName": {"$regex": f"^{category}$", "$options": "i"}
@@ -287,165 +297,100 @@ def cancel_appointment(patient_name, doctor_name, appointment_date, appointment_
 
 
 
-
-
-
-
-
-
-# {
-#                 "name": "reschedule_appointment",
-#                 "description": "Reschedule an existing appointment to a new date and time. Call this function when the patient wants to change the date or time of a booked appointment. Make sure you have both the old appointment details and the new preferred date and time before calling.",
-#                 "parameters": {
-#                   "type": "object",
-#                   "properties": {
-#                     "patient_name": {
-#                       "type": "string",
-#                       "description": "Full name of the patient."
-#                     },
-#                     "doctor_name": {
-#                       "type": "string",
-#                       "description": "Doctor with whom the appointment exists."
-#                     },
-#                     "old_date": {
-#                       "type": "string",
-#                       "description": "Existing appointment date in natural language."
-#                     },
-#                     "old_time": {
-#                       "type": "string",
-#                       "description": "Existing appointment time in natural language."
-#                     },
-#                     "new_date": {
-#                       "type": "string",
-#                       "description": "New preferred appointment date in natural language."
-#                     },
-#                     "new_time": {
-#                       "type": "string",
-#                       "description": "New preferred appointment time in natural language."
-#                     }
-#                   },
-#                   "required": [
-#                     "patient_name",
-#                     "doctor_name",
-#                     "old_date",
-#                     "old_time",
-#                     "new_date",
-#                     "new_time"
-#                   ]
-#                 }
-#               }
-
-# def reschedule_appointment(
-#     patient_name,
-#     doctor_name,
-#     old_date,
-#     old_time,
-#     new_date,
-#     new_time
-# ):
-
-#     try:
-#         old_date_norm = normalize_date(old_date)
-#         old_time_norm = normalize_time(old_time)
-#         new_date_norm = normalize_date(new_date)
-#         new_time_norm = normalize_time(new_time)
-#     except ValueError as e:
-#         return {"error": str(e)}
-
-#     doctor = doctor_collection.find_one({
-#         "name": {"$regex": doctor_name.strip(), "$options": "i"}
-#     })
-
-#     if not doctor:
-#         return {"error": "Doctor not found."}
-
-#     # Check if new slot is already booked
-#     conflict = appointment_collection.find_one({
-#         "doctorId": doctor["_id"],
-#         "date": new_date_norm,
-#         "time": new_time_norm,
-#         "status": "confirmed"
-#     })
-
-#     if conflict:
-#         return {
-#             "error": "Requested new time slot is already booked. Please choose another time."
-#         }
-
-#     # Update existing appointment
-#     updated = appointment_collection.find_one_and_update(
-#         {
-#             "doctorId": doctor["_id"],
-#             "patientName": patient_name,
-#             "date": old_date_norm,
-#             "time": old_time_norm,
-#             "status": "confirmed"
-#         },
-#         {
-#             "$set": {
-#                 "date": new_date_norm,
-#                 "time": new_time_norm
-#             }
-#         }
-#     )
-
-#     if not updated:
-#         return {"error": "Original appointment not found."}
-
-#     return {
-#         "message": f"Your appointment has been rescheduled to {new_date_norm} at {new_time_norm}."
-#     }
-
-
-def reschedule_appointment(patient_name, doctor_name, old_date, old_time, new_date, new_time):
+def reschedule_appointment(
+    patient_name,
+    doctor_name,
+    old_date,
+    old_time,
+    new_date,
+    new_time
+):
     try:
-        old_date = normalize_date(old_date)
-        old_time = normalize_time(old_time)
-        new_date = normalize_date(new_date)
-        new_time = normalize_time(new_time)
+        old_date_norm = normalize_date(old_date)
+        old_time_norm = normalize_time(old_time)
+        new_date_norm = normalize_date(new_date)
+        new_time_norm = normalize_time(new_time)
     except ValueError as e:
         return {"error": str(e)}
 
+    patient_name = patient_name.strip()
+    doctor_name = doctor_name.strip()
+
+    if old_date_norm == new_date_norm and old_time_norm == new_time_norm:
+        return {"error": "New date/time is same as old date/time"}
+
+    # Resolve doctor first (preferred, unambiguous)
     doctor = doctor_collection.find_one({
-        "name": {"$regex": doctor_name.strip(), "$options": "i"}
+        "name": {"$regex": f"^{re.escape(doctor_name)}$", "$options": "i"}
     })
 
-    if not doctor:
-        return {"error": "Doctor not found"}
+    # Find the exact original confirmed appointment
+    original_query = {
+        "patientName": {"$regex": f"^{re.escape(patient_name)}$", "$options": "i"},
+        "date": old_date_norm,
+        "time": old_time_norm,
+        "status": "confirmed"
+    }
 
-    # Check new slot availability
-    existing = appointment_collection.find_one({
-        "doctorId": doctor["_id"],
-        "date": new_date,
-        "time": new_time
-    })
+    if doctor:
+        original_query["doctorId"] = doctor["_id"]
+    else:
+        # Fallback by doctorName if doctor master record is missing
+        original_query["doctorName"] = {
+            "$regex": f"^(Dr\\.?\\s*)?{re.escape(doctor_name)}$",
+            "$options": "i"
+        }
 
-    if existing:
+    original_appointment = appointment_collection.find_one(original_query)
+
+    if not original_appointment:
+        return {"error": "Original appointment not found"}
+
+    doctor_id = original_appointment.get("doctorId")
+    doctor_display_name = original_appointment.get("doctorName", doctor_name)
+
+    # Check conflict in requested new confirmed slot (excluding current appointment)
+    conflict_query = {
+        "date": new_date_norm,
+        "time": new_time_norm,
+        "status": "confirmed",
+        "_id": {"$ne": original_appointment["_id"]}
+    }
+
+    if doctor_id:
+        conflict_query["doctorId"] = doctor_id
+    else:
+        conflict_query["doctorName"] = {
+            "$regex": f"^{re.escape(doctor_display_name)}$",
+            "$options": "i"
+        }
+
+    if appointment_collection.find_one(conflict_query):
         return {"error": "New slot already booked"}
 
-    # Update appointment
-    result = appointment_collection.find_one_and_update(
-        {
-            "doctorId": doctor["_id"],
-            "patientName": patient_name,
-            "date": old_date,
-            "time": old_time,
-            "status": "confirmed"
-        },
+    updated = appointment_collection.find_one_and_update(
+        {"_id": original_appointment["_id"]},
         {
             "$set": {
-                "date": new_date,
-                "time": new_time
+                "date": new_date_norm,
+                "time": new_time_norm,
+                "updatedAt": datetime.utcnow()
             }
         }
     )
 
-    if not result:
-        return {"error": "Original appointment not found"}
+    if not updated:
+        return {"error": "Failed to reschedule appointment"}
 
     return {
-        "message": f"Appointment rescheduled to {new_date} at {new_time}"
+        "message": f"Appointment with {doctor_display_name} rescheduled to {new_date_norm} at {new_time_norm}",
+        "old_date": old_date_norm,
+        "old_time": old_time_norm,
+        "new_date": new_date_norm,
+        "new_time": new_time_norm
     }
+
+
 
 
 

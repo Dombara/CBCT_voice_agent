@@ -9,43 +9,51 @@ from appointment_functions import FUNCTION_MAP
 load_dotenv()
 
 
+# 🧠 Language Detection (for logging + future use)
+def detect_language(text):
+    text = text.lower()
+
+    hindi_words = [
+        "hai", "haan", "nahi", "kya", "kaise", "mujhe",
+        "aap", "kal", "baje", "chahiye", "karna", "naam"
+    ]
+
+    for word in hindi_words:
+        if word in text:
+            return "hi"
+
+    return "en"
+
+
+# 🔌 Connect to Deepgram Agent
 def sts_connect():
     api_key = os.getenv("DEEPGRAM_API_KEY")
     if not api_key:
         raise Exception("DEEPGRAM_API_KEY not found")
 
-    sts_ws = websockets.connect(
+    return websockets.connect(
         "wss://agent.deepgram.com/v1/agent/converse",
         subprotocols=["token", api_key]
     )
-    return sts_ws
 
 
+# 📄 Load config
 def load_config():
     with open("config.json", "r") as f:
         return json.load(f)
 
 
-async def handle_barge_in(decoded, twilio_ws, streamsid):
-    if decoded["type"] == "UserStartedSpeaking":
-        clear_message = {
-            "event": "clear",
-            "streamSid": streamsid
-        }
-        await twilio_ws.send(json.dumps(clear_message))
-
-
+# ⚙️ Execute function calls
 def execute_function_call(func_name, arguments):
     if func_name in FUNCTION_MAP:
         result = FUNCTION_MAP[func_name](**arguments)
         print(f"Function call result: {result}")
         return result
     else:
-        result = {"error": f"Unknown function: {func_name}"}
-        print(result)
-        return result
+        return {"error": f"Unknown function: {func_name}"}
 
 
+# 🔁 Create response for function calls
 def create_function_call_response(func_id, func_name, result):
     return {
         "type": "FunctionCallResponse",
@@ -55,6 +63,7 @@ def create_function_call_response(func_id, func_name, result):
     }
 
 
+# ⚙️ Handle function call requests
 async def handle_function_call_request(decoded, sts_ws):
     try:
         for function_call in decoded["functions"]:
@@ -62,60 +71,75 @@ async def handle_function_call_request(decoded, sts_ws):
             func_id = function_call["id"]
             arguments = json.loads(function_call["arguments"])
 
-            print(f"Function call: {func_name} (ID: {func_id}), arguments: {arguments}")
+            print(f"Function call: {func_name}, args: {arguments}")
 
             result = execute_function_call(func_name, arguments)
 
-            function_result = create_function_call_response(func_id, func_name, result)
+            function_result = create_function_call_response(
+                func_id, func_name, result
+            )
+
             await sts_ws.send(json.dumps(function_result))
-            print(f"Sent function result: {function_result}")
 
     except Exception as e:
         print(f"Error calling function: {e}")
-        error_result = create_function_call_response(
-            func_id if "func_id" in locals() else "unknown",
-            func_name if "func_name" in locals() else "unknown",
-            {"error": f"Function call failed with: {str(e)}"}
-        )
-        await sts_ws.send(json.dumps(error_result))
 
 
-async def handle_text_message(decoded, twilio_ws, sts_ws, streamsid):
-    # await handle_barge_in(decoded, twilio_ws, streamsid)
+# 🧠 Handle text messages (NO INVALID MESSAGE SENDING)
+async def handle_text_message(decoded, session_state):
 
-    if decoded["type"] == "FunctionCallRequest":
-        await handle_function_call_request(decoded, sts_ws)
+    if decoded["type"] == "ConversationText" and decoded["role"] == "user":
+
+        user_text = decoded["content"]
+
+        # 🔥 Detect + lock language (ONLY for logging/future use)
+        if not session_state.get("language"):
+            lang = detect_language(user_text)
+            session_state["language"] = lang
+            print(f"[LANG LOCKED]: {lang}")
 
 
+# 📤 Send audio to Deepgram
 async def sts_sender(sts_ws, audio_queue):
-    print("sts_sender started")
     while True:
         chunk = await audio_queue.get()
         await sts_ws.send(chunk)
 
 
-async def sts_receiver(sts_ws, twilio_ws, streamsid_queue):
-    print("sts_receiver started")
+# 📥 Receive from Deepgram
+async def sts_receiver(sts_ws, twilio_ws, streamsid_queue, session_state):
     streamsid = await streamsid_queue.get()
 
     async for message in sts_ws:
-        if type(message) is str:
+
+        if isinstance(message, str):
             print(message)
             decoded = json.loads(message)
-            await handle_text_message(decoded, twilio_ws, sts_ws, streamsid)
+
+            # 🧠 Handle language detection
+            await handle_text_message(decoded, session_state)
+
+            # ⚙️ Handle function calls
+            if decoded["type"] == "FunctionCallRequest":
+                await handle_function_call_request(decoded, sts_ws)
+
             continue
 
+        # 🔊 Forward audio to Twilio
         raw_mulaw = message
 
         media_message = {
             "event": "media",
             "streamSid": streamsid,
-            "media": {"payload": base64.b64encode(raw_mulaw).decode("ascii")}
+            "media": {
+                "payload": base64.b64encode(raw_mulaw).decode("ascii")
+            }
         }
 
         await twilio_ws.send(json.dumps(media_message))
 
 
+# 📥 Receive audio from Twilio
 async def twilio_receiver(twilio_ws, audio_queue, streamsid_queue):
     BUFFER_SIZE = 20 * 160
     inbuffer = bytearray(b"")
@@ -126,17 +150,16 @@ async def twilio_receiver(twilio_ws, audio_queue, streamsid_queue):
             event = data["event"]
 
             if event == "start":
+                streamsid = data["start"]["streamSid"]
                 print("get our streamsid")
-                start = data["start"]
-                streamsid = start["streamSid"]
                 streamsid_queue.put_nowait(streamsid)
-            elif event == "connected":
-                continue
+
             elif event == "media":
-                media = data["media"]
-                chunk = base64.b64decode(media["payload"])
-                if media["track"] == "inbound":
+                chunk = base64.b64decode(data["media"]["payload"])
+
+                if data["media"]["track"] == "inbound":
                     inbuffer.extend(chunk)
+
             elif event == "stop":
                 break
 
@@ -144,29 +167,36 @@ async def twilio_receiver(twilio_ws, audio_queue, streamsid_queue):
                 chunk = inbuffer[:BUFFER_SIZE]
                 audio_queue.put_nowait(chunk)
                 inbuffer = inbuffer[BUFFER_SIZE:]
+
         except:
             break
 
 
+# 🔗 Main handler
 async def twilio_handler(twilio_ws):
     audio_queue = asyncio.Queue()
     streamsid_queue = asyncio.Queue()
+    session_state = {}   # 🔥 store language here
 
     async with sts_connect() as sts_ws:
+
         config_message = load_config()
         await sts_ws.send(json.dumps(config_message))
 
-        await asyncio.wait(
-            [
-                asyncio.ensure_future(sts_sender(sts_ws, audio_queue)),
-                asyncio.ensure_future(sts_receiver(sts_ws, twilio_ws, streamsid_queue)),
-                asyncio.ensure_future(twilio_receiver(twilio_ws, audio_queue, streamsid_queue)),
-            ]
-        )
+        await asyncio.wait([
+            asyncio.ensure_future(sts_sender(sts_ws, audio_queue)),
+            asyncio.ensure_future(sts_receiver(
+                sts_ws, twilio_ws, streamsid_queue, session_state
+            )),
+            asyncio.ensure_future(twilio_receiver(
+                twilio_ws, audio_queue, streamsid_queue
+            )),
+        ])
 
-        await twilio_ws.close()
+    await twilio_ws.close()
 
 
+# 🚀 Start server
 async def main():
     await websockets.serve(twilio_handler, "localhost", 8888)
     print("Started server in port 8888.")

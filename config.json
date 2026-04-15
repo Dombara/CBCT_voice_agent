@@ -15,34 +15,32 @@
     "listen": {
       "provider": {
         "type": "deepgram",
-        "model": "nova-3",
-        "keyterms": ["hello", "goodbye"]
+        "model": "nova-3"
       }
     },
     "think": {
       "provider": {
         "type": "open_ai",
         "model": "gpt-4o-mini",
-        "temperature": 0.7
+        "temperature": 0.5
       },
-      "prompt": "You are a polite and professional Indian appointment booking assistant.\n\nYou can communicate fluently in English, Hindi, and Hinglish (Hindi written in English letters).\n\nCRITICAL LANGUAGE RULE:\n- You MUST reply in the SAME language as the user.\n- Treat Hinglish (like 'mujhe', 'naam', 'kal', 'haan') as Hindi.\n- If the user uses ANY Hindi or Hinglish words, you MUST reply in Hindi.\n- NEVER switch to English unless the user speaks only in English.\n- If you respond in the wrong language, it is considered a failure.\n\nExamples:\nUser: Mujhe appointment book karna hai\nAssistant: Ji haan, main aapki madad kar deta hoon. Aapka naam bataiye.\n\nUser: Kal 10 baje appointment chahiye\nAssistant: Theek hai, kal 10 baje ke liye appointment book kar dete hain. Aapka naam kya hai?\n\nUser: I want to book an appointment\nAssistant: Sure, I can help you with that.\n\nBehavior Rules:\n- Always ask users to clearly state or spell their full name when booking.\n- Always confirm patient name, doctor name, date, and time before booking.\n- Never assume doctor name.\n- If input is unclear, politely ask again.\n\nConversation Style:\n- Use natural Indian conversational tone.\n- Use phrases like: Ji haan, Theek hai, Aap bataiye, Main check karta hoon.\n- Keep responses short and suitable for voice.\n\nIMPORTANT:\n- Respond ONLY in natural conversational text.\n- NEVER use bullet points, lists, dashes, or markdown.\n\nYou can:\n1) List doctors\n2) Get doctor information\n3) Book appointments\n4) Look up appointments\n5) Cancel appointments",
+      "prompt": "You are a professional Indian appointment booking assistant.\n\nThe user's language is determined from the FIRST message.\n\nLanguage Rules:\n- If the user starts in English, continue ONLY in English.\n- If the user starts in Hindi or Hinglish, continue ONLY in Hinglish.\n- Do NOT switch language mid-conversation.\n\nConversation Style:\n- Keep responses short and natural for voice.\n- Use polite Indian conversational tone.\n\nBehavior Rules:\n- Always ask for full name clearly when booking.\n- Always confirm doctor, date, and time before booking.\n- Never assume missing details.\n- If input is unclear, ask politely.\n\nIMPORTANT:\n- Respond ONLY in plain conversational text.\n- Do NOT use bullet points, markdown, or special symbols.",
       "functions": [
         {
           "name": "list_doctors",
-          "description": "Get a list of doctors by medical category. If the patient mentions symptoms, infer the appropriate category before calling this function.",
+          "description": "Get a list of doctors by medical category.",
           "parameters": {
             "type": "object",
             "properties": {
               "category": {
-                "type": "string",
-                "description": "Medical specialization such as Dentist, Cardiologist, Dermatologist, Orthopedic, etc."
+                "type": "string"
               }
             }
           }
         },
         {
           "name": "get_doctor_info",
-          "description": "Get detailed information about a specific doctor.",
+          "description": "Get details about a specific doctor.",
           "parameters": {
             "type": "object",
             "properties": {
@@ -72,7 +70,12 @@
                 "type": "string"
               }
             },
-            "required": ["patient_name", "doctor_name", "preferred_date", "preferred_time"]
+            "required": [
+              "patient_name",
+              "doctor_name",
+              "preferred_date",
+              "preferred_time"
+            ]
           }
         },
         {
@@ -109,7 +112,47 @@
                 "type": "string"
               }
             },
-            "required": ["patient_name", "doctor_name", "appointment_date", "appointment_time"]
+            "required": [
+              "patient_name",
+              "doctor_name",
+              "appointment_date",
+              "appointment_time"
+            ]
+          }
+        },
+        {
+          "name": "reschedule_appointment",
+          "description": "Reschedule an existing appointment to a new date and time.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "patient_name": {
+                "type": "string"
+              },
+              "doctor_name": {
+                "type": "string"
+              },
+              "old_date": {
+                "type": "string"
+              },
+              "old_time": {
+                "type": "string"
+              },
+              "new_date": {
+                "type": "string"
+              },
+              "new_time": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "patient_name",
+              "doctor_name",
+              "old_date",
+              "old_time",
+              "new_date",
+              "new_time"
+            ]
           }
         }
       ]
@@ -117,9 +160,9 @@
     "speak": {
       "provider": {
         "type": "deepgram",
-        "model": "aura-luna-en"
+        "model": "aura-asteria-en"
       }
     },
-    "greeting": "Hello! I'm your appointment booking assistant. I can help you view available doctors, get doctor information, book appointments, and check your appointment details. How can I assist you today?"
+    "greeting": "Hello! I can help you book appointments, find doctors, or check your bookings. How can I assist you today?"
   }
 }
