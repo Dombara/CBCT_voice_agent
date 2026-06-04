@@ -13,25 +13,7 @@ app = FastAPI()
 load_dotenv()
 
 
-def get_public_base_url():
-    return (
-        os.getenv("PUBLIC_BASE_URL")
-        or os.getenv("RENDER_EXTERNAL_URL")
-        or "http://localhost:8888"
-    ).rstrip("/")
-
-
-def get_twilio_stream_url():
-    base_url = get_public_base_url()
-
-    if base_url.startswith("https://"):
-        return f"wss://{base_url.removeprefix('https://')}/twilio"
-
-    if base_url.startswith("http://"):
-        return f"ws://{base_url.removeprefix('http://')}/twilio"
-
-    return f"wss://{base_url}/twilio"
-
+ 
 
 #  Language Detection (for logging + future use)
 # def detect_language(text):
