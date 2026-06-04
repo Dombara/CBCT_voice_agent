@@ -6,6 +6,20 @@ import re
 from utils.date_utils import normalize_date, normalize_time
 
 
+WORK_START = "09:00"
+WORK_END = "17:00"
+
+
+def _is_within_working_hours(time_str: str) -> bool:
+    try:
+        normalized = datetime.strptime(time_str, "%H:%M").time()
+        start = datetime.strptime(WORK_START, "%H:%M").time()
+        end = datetime.strptime(WORK_END, "%H:%M").time()
+        return start <= normalized <= end
+    except ValueError:
+        return False
+
+
 
 
 # def get_doctor_info(doctor_name):
@@ -147,6 +161,12 @@ def book_appointment(patient_name, doctor_name, preferred_date, preferred_time):
         return {
             "error": "Invalid date or time",
             "message": str(e)
+        }
+
+    if not _is_within_working_hours(normalized_time):
+        return {
+            "error": "Invalid time",
+            "message": "Please choose a time between 09:00 and 17:00."
         }
 
     registered_user = user_collection.find_one({
@@ -312,6 +332,12 @@ def reschedule_appointment(
         new_time_norm = normalize_time(new_time)
     except ValueError as e:
         return {"error": str(e)}
+
+    if not _is_within_working_hours(new_time_norm):
+        return {
+            "error": "Invalid time",
+            "message": "Please choose a time between 09:00 and 17:00."
+        }
 
     patient_name = patient_name.strip()
     doctor_name = doctor_name.strip()

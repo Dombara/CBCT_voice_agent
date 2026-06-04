@@ -11,7 +11,6 @@ def generate_hindi_tts(text):
         region=AZURE_REGION
     )
 
-    # 🔥 Best Hindi voice
     speech_config.speech_synthesis_voice_name = "hi-IN-NeerjaNeural"
 
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:

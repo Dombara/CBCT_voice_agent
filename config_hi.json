@@ -1,0 +1,168 @@
+{
+  "type": "Settings",
+  "audio": {
+    "input": {
+      "encoding": "mulaw",
+      "sample_rate": 8000
+    },
+    "output": {
+      "encoding": "mulaw",
+      "sample_rate": 8000,
+      "container": "none"
+    }
+  },
+  "agent": {
+    "listen": {
+      "provider": {
+        "type": "deepgram",
+        "model": "nova-3"
+      }
+    },
+    "think": {
+      "provider": {
+        "type": "open_ai",
+        "model": "gpt-4o-mini",
+        "temperature": 0.5
+      },
+      "prompt": "You are a professional Indian appointment booking assistant.\n\nThe user has selected Hindi language.\n\nLanguage Rules:\n- Respond ONLY in natural Hinglish (Hindi written in simple conversational form).\n- Do NOT use pure English sentences.\n- Use simple, clear spoken Hindi suitable for voice calls.\n- Do NOT switch language mid-conversation.\n\nConversation Style:\n- Keep responses short, clear, and natural for voice.\n- Use polite Indian conversational tone.\n- Speak like a real receptionist talking on a phone call.\n\nBehavior Rules:\n- Always ask for full name clearly when booking.\n- Always confirm doctor, date, and time before booking.\n- Never assume missing details.\n- If input is unclear, ask politely in Hindi.\n- Sirf 9:00 AM se 5:00 PM ke beech ka time allow karo. Agar user is range ke bahar time de, to politely working hours ke andar doosra time maango.\n\nIMPORTANT:\n- Respond ONLY in plain conversational text.\n- Do NOT use bullet points, markdown, or special symbols.\n- Avoid long sentences. Keep it simple and natural for speech.",
+      "functions": [
+        {
+          "name": "list_doctors",
+          "description": "Get a list of doctors by medical category.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "category": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "name": "get_doctor_info",
+          "description": "Get details about a specific doctor.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "doctor_name": {
+                "type": "string"
+              }
+            },
+            "required": ["doctor_name"]
+          }
+        },
+        {
+          "name": "book_appointment",
+          "description": "Book an appointment with a doctor.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "patient_name": {
+                "type": "string"
+              },
+              "doctor_name": {
+                "type": "string"
+              },
+              "preferred_date": {
+                "type": "string"
+              },
+              "preferred_time": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "patient_name",
+              "doctor_name",
+              "preferred_date",
+              "preferred_time"
+            ]
+          }
+        },
+        {
+          "name": "lookup_appointment",
+          "description": "Look up an appointment.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "appointment_id": {
+                "type": "string"
+              },
+              "patient_name": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "name": "cancel_appointment",
+          "description": "Cancel an appointment.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "patient_name": {
+                "type": "string"
+              },
+              "doctor_name": {
+                "type": "string"
+              },
+              "appointment_date": {
+                "type": "string"
+              },
+              "appointment_time": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "patient_name",
+              "doctor_name",
+              "appointment_date",
+              "appointment_time"
+            ]
+          }
+        },
+        {
+          "name": "reschedule_appointment",
+          "description": "Reschedule an existing appointment to a new date and time.",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "patient_name": {
+                "type": "string"
+              },
+              "doctor_name": {
+                "type": "string"
+              },
+              "old_date": {
+                "type": "string"
+              },
+              "old_time": {
+                "type": "string"
+              },
+              "new_date": {
+                "type": "string"
+              },
+              "new_time": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "patient_name",
+              "doctor_name",
+              "old_date",
+              "old_time",
+              "new_date",
+              "new_time"
+            ]
+          }
+        }
+      ]
+    },
+    "speak": {
+      "provider": {
+        "type": "deepgram",
+        "model": "aura-asteria-en"
+      }
+    },
+    "greeting": "Namaste, main aapki kaise madad kar sakti hoon?"
+  }
+}
